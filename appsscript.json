@@ -1,0 +1,15 @@
+{
+  "timeZone": "Australia/Melbourne",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/spreadsheets.currentonly",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.container.ui"
+  ],
+  "sheets": {
+    "macros": []
+  }
+}

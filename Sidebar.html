@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      background: #f8f9fa;
+      padding: 16px;
+      color: #202124;
+      line-height: 1.6;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #e8eaed;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 500;
+      color: #1a73e8;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 14px;
+      color: #5f6368;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    }
+
+    .card h2 {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #202124;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+
+    .status-badge.ready {
+      background: #e6f4ea;
+      color: #137333;
+    }
+
+    .status-badge.warning {
+      background: #fef7e0;
+      color: #b06000;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-primary {
+      background: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #1765cc;
+    }
+
+    .btn-secondary {
+      background: white;
+      color: #1a73e8;
+      border: 1px solid #dadce0;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #f8f9fa;
+    }
+
+    .btn-success {
+      background: #34a853;
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      background: #2d9249;
+    }
+
+    .btn-danger {
+      background: #ea4335;
+      color: white;
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #d33b2c;
+    }
+
+    .progress-container {
+      margin-top: 12px;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 2px solid #e8eaed;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      border: 1px solid #e8eaed;
+    }
+
+    .stat-number {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a73e8;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #5f6368;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+
+    .progress-bar-wrapper {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #e8eaed;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #e8eaed;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #1a73e8 0%, #4285f4 100%);
+      border-radius: 6px;
+      transition: width 0.3s ease;
+    }
+
+    .progress-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: #5f6368;
+    }
+
+    .progress-info #analysisProgressPercent {
+      font-weight: 600;
+      color: #1a73e8;
+      font-size: 14px;
+    }
+
+    .progress-text {
+      font-size: 13px;
+      color: #5f6368;
+    }
+
+    .select-wrapper {
+      margin-bottom: 8px;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 14px;
+      background: white;
+      color: #202124;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #1a73e8;
+    }
+
+    .info-text {
+      font-size: 13px;
+      color: #5f6368;
+      padding: 8px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+
+    .success-message {
+      background: #e6f4ea;
+      color: #137333;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    .error-message {
+      background: #fce8e6;
+      color: #c5221f;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #e8eaed;
+      border-top: 2px solid #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📧 Gmail Cleaner</h1>
+    <p>Analyse & Organise Your Inbox</p>
+  </div>
+
+  <div class="card">
+    <h2>Setup</h2>
+    <button class="btn btn-primary" onclick="runSetup()">Setup Sheets</button>
+    <p class="info-text">Creates Analysis, Rules, and Logs sheets if they don't exist.</p>
+    <div id="setupStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>Inbox Analysis</h2>
+    
+    <div class="select-wrapper">
+      <label for="scanLimitInput" style="font-size: 13px; colour: #5f6368; margin-bottom: 4px; display: block;">
+        Scan Limit (emails to analyse)
+      </label>
+      <input 
+        type="number" 
+        id="scanLimitInput" 
+        value="1000" 
+        min="100" 
+        max="20000" 
+        step="100"
+        style="width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; margin-bottom: 8px;"
+      >
+    </div>
+    
+    <button class="btn btn-primary" id="analyseBtn" onclick="runAnalysis()">Analyse Inbox</button>
+    <button class="btn btn-danger" id="cancelAnalysisBtn" style="display: none;" onclick="cancelAnalysis()">Cancel Analysis</button>
+    <button class="btn btn-secondary" id="resumeAnalysisBtn" style="display: none;" onclick="resumeAnalysis()">Resume Analysis</button>
+    <button class="btn btn-secondary" id="clearAnalysisBtn" onclick="clearAndRestart()">Clear & Restart Scan</button>
+    <p class="info-text">Scans your inbox and counts emails by sender. Adjust the limit above to control how many emails to scan.</p>
+    
+    <div id="analysisProgressContainer" class="progress-container" style="display: none;">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="totalEmailsScanned">0</div>
+          <div class="stat-label">Emails Scanned</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="uniqueSendersFound">0</div>
+          <div class="stat-label">Unique Senders</div>
+        </div>
+      </div>
+      
+      <div class="progress-bar-wrapper">
+        <div class="progress-bar">
+          <div id="analysisProgressFill" class="progress-fill" style="width: 0%;"></div>
+        </div>
+        <div class="progress-info">
+          <span id="analysisProgressPercent">0%</span>
+          <span id="analysisProgressStatus">Starting...</span>
+        </div>
+      </div>
+    </div>
+    
+    <div id="analysisStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>Cleanup</h2>
+    <button class="btn btn-success" id="cleanupBtn" onclick="runCleanup()">Run Cleanup</button>
+    <button class="btn btn-danger" id="cancelCleanupBtn" style="display: none;" onclick="cancelCleanup()">Cancel Cleanup</button>
+    <p class="info-text">Processes active rules from the Rules sheet.</p>
+    
+    <div id="cleanupProgressContainer" class="progress-container" style="display: none;">
+      <div class="progress-bar">
+        <div id="cleanupProgressFill" class="progress-fill" style="width: 0%;"></div>
+      </div>
+      <p id="cleanupProgressText" class="progress-text"></p>
+    </div>
+    
+    <div id="cleanupStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>Automation</h2>
+    <div class="select-wrapper">
+      <select id="scheduleSelect">
+        <option value="none">No Automation</option>
+        <option value="daily">Daily at 2:00 AM</option>
+        <option value="weekly">Weekly (Mondays at 2:00 AM)</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="updateSchedule()">Update Schedule</button>
+    <div id="scheduleStatus"></div>
+  </div>
+
+  <script>
+    let totalEmailsProcessed = 0;
+    let totalSenders = 0;
+    let totalEmailsCleaned = 0;
+    let isAnalysing = false;
+    let isCleaning = false;
+    let currentScanLimit = 1000;
+    let cancelAnalysisRequested = false;
+    let cancelCleanupRequested = false;
+
+    function runSetup() {
+      const button = event.target;
+      button.disabled = true;
+      button.innerHTML = '<span class="loading-spinner"></span>Setting up...';
+      document.getElementById('setupStatus').innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(response => {
+          button.disabled = false;
+          button.innerHTML = 'Setup Sheets';
+          if (response.success) {
+            document.getElementById('setupStatus').innerHTML = 
+              `<div class="success-message">${response.message}</div>`;
+          } else {
+            document.getElementById('setupStatus').innerHTML = 
+              `<div class="error-message">${response.message}</div>`;
+          }
+        })
+        .withFailureHandler(error => {
+          button.disabled = false;
+          button.innerHTML = 'Setup Sheets';
+          document.getElementById('setupStatus').innerHTML = 
+            `<div class="error-message">Error: ${error.message}</div>`;
+        })
+        .setupSheets();
+    }
+
+    function runAnalysis() {
+      if (isAnalysing) return;
+      
+      const scanLimitInput = document.getElementById('scanLimitInput');
+      currentScanLimit = parseInt(scanLimitInput.value) || 1000;
+      
+      if (currentScanLimit < 100) {
+        alert('Scan limit must be at least 100 emails');
+        return;
+      }
+      if (currentScanLimit > 20000) {
+        alert('Scan limit cannot exceed 20,000 emails (Gmail API daily limit)');
+        return;
+      }
+      
+      isAnalysing = true;
+      cancelAnalysisRequested = false;
+      totalEmailsProcessed = 0;
+      totalSenders = 0;
+      
+      const analyseBtn = document.getElementById('analyseBtn');
+      const cancelBtn = document.getElementById('cancelAnalysisBtn');
+      const clearBtn = document.getElementById('clearAnalysisBtn');
+      const resumeBtn = document.getElementById('resumeAnalysisBtn');
+      
+      analyseBtn.style.display = 'none';
+      cancelBtn.style.display = 'block';
+      clearBtn.style.display = 'none';
+      resumeBtn.style.display = 'none';
+      scanLimitInput.disabled = true;
+      
+      document.getElementById('analysisProgressContainer').style.display = 'block';
+      document.getElementById('analysisStatus').innerHTML = '';
+      
+      document.getElementById('totalEmailsScanned').textContent = '0';
+      document.getElementById('uniqueSendersFound').textContent = '0';
+      document.getElementById('analysisProgressFill').style.width = '0%';
+      document.getElementById('analysisProgressPercent').textContent = '0%';
+      document.getElementById('analysisProgressStatus').textContent = 'Scanning...';
+      
+      processAnalysisBatch(0, true);
+    }
+
+    function cancelAnalysis() {
+      cancelAnalysisRequested = true;
+      document.getElementById('analysisStatus').innerHTML = 
+        '<div class="info-text">Cancelling... finishing current batch</div>';
+      document.getElementById('cancelAnalysisBtn').disabled = true;
+    }
+
+    function clearAndRestart() {
+      if (isAnalysing) {
+        alert('Please wait for the current analysis to finish or cancel it first.');
+        return;
+      }
+      
+      if (!confirm('This will clear all analysis data and start fresh. Continue?')) {
+        return;
+      }
+      
+      const button = document.getElementById('clearAnalysisBtn');
+      button.disabled = true;
+      button.innerHTML = '<span class="loading-spinner"></span>Clearing...';
+      
+      google.script.run
+        .withSuccessHandler(response => {
+          button.disabled = false;
+          button.innerHTML = 'Clear & Restart Scan';
+          
+          document.getElementById('analysisProgressContainer').style.display = 'none';
+          document.getElementById('analysisProgressFill').style.width = '0%';
+          document.getElementById('totalEmailsScanned').textContent = '0';
+          document.getElementById('uniqueSendersFound').textContent = '0';
+          document.getElementById('analysisProgressPercent').textContent = '0%';
+          document.getElementById('analysisProgressStatus').textContent = 'Starting...';
+          document.getElementById('resumeAnalysisBtn').style.display = 'none';
+          
+          totalEmailsProcessed = 0;
+          totalSenders = 0;
+          
+          if (response.success) {
+            document.getElementById('analysisStatus').innerHTML = 
+              `<div class="success-message">${response.message}</div>`;
+          } else {
+            document.getElementById('analysisStatus').innerHTML = 
+              `<div class="error-message">${response.message}</div>`;
+          }
+        })
+        .withFailureHandler(error => {
+          button.disabled = false;
+          button.innerHTML = 'Clear & Restart Scan';
+          document.getElementById('analysisStatus').innerHTML = 
+            `<div class="error-message">Error: ${error.message}</div>`;
+        })
+        .clearAnalysisData();
+    }
+
+    function resumeAnalysis() {
+      if (isAnalysing) return;
+      
+      isAnalysing = true;
+      
+      google.script.run
+        .withSuccessHandler(progress => {
+          const startIndex = progress.lastIndex || 0;
+          processAnalysisBatch(startIndex, false);
+        })
+        .withFailureHandler(error => {
+          isAnalysing = false;
+          document.getElementById('analysisStatus').innerHTML = 
+            `<div class="error-message">Error: ${error.message}</div>`;
+        })
+        .getAnalysisProgress();
+    }
+
+    function processAnalysisBatch(startIndex, clearSheet) {
+      if (cancelAnalysisRequested) {
+        finishAnalysis(false, true);
+        return;
+      }
+      
+      google.script.run
+        .withSuccessHandler(result => {
+          if (!result.success) {
+            isAnalysing = false;
+            const analyseBtn = document.getElementById('analyseBtn');
+            const cancelBtn = document.getElementById('cancelAnalysisBtn');
+            
+            analyseBtn.style.display = 'block';
+            cancelBtn.style.display = 'none';
+            document.getElementById('scanLimitInput').disabled = false;
+            
+            document.getElementById('analysisStatus').innerHTML = 
+              `<div class="error-message">Scan stopped: ${result.message}</div>`;
+            
+            if (result.canResume) {
+              document.getElementById('resumeAnalysisBtn').style.display = 'block';
+            }
+            return;
+          }
+
+          updateAnalysisProgress(result);
+          
+          if (cancelAnalysisRequested) {
+            finishAnalysis(false, true);
+          } else if (result.limitReached) {
+            finishAnalysis(true, false);
+          } else if (result.hasMore) {
+            google.script.run.saveAnalysisProgress(result.nextIndex);
+            processAnalysisBatch(result.nextIndex, false);
+          } else {
+            finishAnalysis(false, false);
+          }
+        })
+        .withFailureHandler(error => {
+          isAnalysing = false;
+          const analyseBtn = document.getElementById('analyseBtn');
+          const cancelBtn = document.getElementById('cancelAnalysisBtn');
+          
+          analyseBtn.style.display = 'block';
+          cancelBtn.style.display = 'none';
+          document.getElementById('scanLimitInput').disabled = false;
+          
+          document.getElementById('analysisStatus').innerHTML = 
+            `<div class="error-message">System Error: ${error.message}</div>`;
+          document.getElementById('resumeAnalysisBtn').style.display = 'block';
+        })
+        .scanInbox(startIndex, clearSheet, currentScanLimit);
+    }
+
+    function updateAnalysisProgress(result) {
+      const emailsInChunk = result.emailsProcessed || 0;
+      totalEmailsProcessed += emailsInChunk;
+      
+      // Update senders only if provided and greater than current
+      if (result.senderCount !== undefined && result.senderCount > totalSenders) {
+        totalSenders = result.senderCount;
+      }
+      
+      const progressPercent = currentScanLimit > 0 
+        ? Math.min((totalEmailsProcessed / currentScanLimit) * 100, 100)
+        : 0;
+      
+      document.getElementById('totalEmailsScanned').textContent = totalEmailsProcessed.toLocaleString();
+      document.getElementById('uniqueSendersFound').textContent = totalSenders.toLocaleString();
+      document.getElementById('analysisProgressFill').style.width = progressPercent.toFixed(1) + '%';
+      document.getElementById('analysisProgressPercent').textContent = progressPercent.toFixed(1) + '%';
+      
+      const remaining = Math.max(0, currentScanLimit - totalEmailsProcessed);
+      const statusText = remaining > 0 
+        ? `${remaining.toLocaleString()} emails remaining` 
+        : 'Scan complete';
+      document.getElementById('analysisProgressStatus').textContent = statusText;
+    }
+
+    function finishAnalysis(limitReached = false, wasCancelled = false) {
+      isAnalysing = false;
+      cancelAnalysisRequested = false;
+      
+      const analyseBtn = document.getElementById('analyseBtn');
+      const cancelBtn = document.getElementById('cancelAnalysisBtn');
+      const clearBtn = document.getElementById('clearAnalysisBtn');
+      
+      analyseBtn.style.display = 'block';
+      cancelBtn.style.display = 'none';
+      cancelBtn.disabled = false;
+      clearBtn.style.display = 'block';
+      document.getElementById('scanLimitInput').disabled = false;
+      
+      google.script.run.clearAnalysisProgress();
+      
+      let message = '';
+      let messageClass = 'success-message';
+      
+      if (wasCancelled) {
+        message = `Analysis cancelled. ${totalEmailsProcessed.toLocaleString()} emails processed, ${totalSenders.toLocaleString()} unique senders found before cancellation.`;
+        messageClass = 'info-text';
+      } else {
+        message = `Analysis complete! ${totalEmailsProcessed.toLocaleString()} emails processed, ${totalSenders.toLocaleString()} unique senders found.`;
+        if (limitReached) {
+          message += ` <br><small>Scan limit (${currentScanLimit.toLocaleString()} emails) reached. Increase the limit above to scan more.</small>`;
+        }
+      }
+      
+      document.getElementById('analysisStatus').innerHTML = 
+        `<div class="${messageClass}">${message}</div>`;
+    }
+
+    function runCleanup() {
+      if (isCleaning) return;
+      
+      isCleaning = true;
+      cancelCleanupRequested = false;
+      totalEmailsCleaned = 0;
+      
+      const cleanupBtn = document.getElementById('cleanupBtn');
+      const cancelBtn = document.getElementById('cancelCleanupBtn');
+      
+      cleanupBtn.style.display = 'none';
+      cancelBtn.style.display = 'block';
+      
+      document.getElementById('cleanupProgressContainer').style.display = 'block';
+      document.getElementById('cleanupStatus').innerHTML = '';
+      
+      processCleanupBatch(0, 0);
+    }
+
+    function cancelCleanup() {
+      cancelCleanupRequested = true;
+      document.getElementById('cleanupStatus').innerHTML = 
+        '<div class="info-text">Cancelling... finishing current batch</div>';
+      document.getElementById('cancelCleanupBtn').disabled = true;
+    }
+
+    function processCleanupBatch(ruleIndex, batchStart) {
+      if (cancelCleanupRequested) {
+        finishCleanup(true);
+        return;
+      }
+      
+      google.script.run
+        .withSuccessHandler(result => {
+          updateCleanupProgress(result);
+          
+          if (cancelCleanupRequested) {
+            finishCleanup(true);
+          } else if (result.isComplete) {
+            finishCleanup(false);
+          } else if (result.hasMoreInRule) {
+            processCleanupBatch(result.ruleIndex, result.batchStart);
+          } else if (result.hasMoreRules) {
+            processCleanupBatch(result.nextRuleIndex, 0);
+          } else {
+            finishCleanup(false);
+          }
+        })
+        .withFailureHandler(error => {
+          isCleaning = false;
+          const cleanupBtn = document.getElementById('cleanupBtn');
+          const cancelBtn = document.getElementById('cancelCleanupBtn');
+          
+          cleanupBtn.style.display = 'block';
+          cancelBtn.style.display = 'none';
+          
+          document.getElementById('cleanupStatus').innerHTML = 
+            `<div class="error-message">Error: ${error.message}</div>`;
+        })
+        .runCleanup(ruleIndex, batchStart);
+    }
+
+    function updateCleanupProgress(result) {
+      const emailsInBatch = result.emailsProcessed || 0;
+      totalEmailsCleaned += emailsInBatch;
+      
+      const progressPercent = result.totalRules > 0 
+        ? ((result.nextRuleIndex || result.ruleIndex) / result.totalRules) * 100 
+        : 0;
+      
+      document.getElementById('cleanupProgressFill').style.width = progressPercent + '%';
+      
+      let statusText = `${totalEmailsCleaned.toLocaleString()} emails processed`;
+      if (result.currentRuleName) {
+        statusText += ` &bull; ${result.currentRuleName}`;
+      }
+      
+      document.getElementById('cleanupProgressText').innerHTML = statusText;
+    }
+
+    function finishCleanup(wasCancelled = false) {
+      isCleaning = false;
+      cancelCleanupRequested = false;
+      
+      const cleanupBtn = document.getElementById('cleanupBtn');
+      const cancelBtn = document.getElementById('cancelCleanupBtn');
+      
+      cleanupBtn.style.display = 'block';
+      cancelBtn.style.display = 'none';
+      cancelBtn.disabled = false;
+      
+      let message = '';
+      let messageClass = 'success-message';
+      
+      if (wasCancelled) {
+        message = `Cleanup cancelled. ${totalEmailsCleaned.toLocaleString()} emails processed before cancellation.`;
+        messageClass = 'info-text';
+      } else {
+        message = `Cleanup complete! ${totalEmailsCleaned.toLocaleString()} emails processed.`;
+      }
+      
+      document.getElementById('cleanupStatus').innerHTML = 
+        `<div class="${messageClass}">${message}</div>`;
+    }
+
+    function updateSchedule() {
+      const button = event.target;
+      const select = document.getElementById('scheduleSelect');
+      const frequency = select.value;
+      
+      button.disabled = true;
+      button.innerHTML = '<span class="loading-spinner"></span>Updating...';
+      document.getElementById('scheduleStatus').innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(response => {
+          button.disabled = false;
+          button.innerHTML = 'Update Schedule';
+          if (response.success) {
+            document.getElementById('scheduleStatus').innerHTML = 
+              `<div class="success-message">${response.message}</div>`;
+          } else {
+            document.getElementById('scheduleStatus').innerHTML = 
+              `<div class="error-message">${response.message}</div>`;
+          }
+        })
+        .withFailureHandler(error => {
+          button.disabled = false;
+          button.innerHTML = 'Update Schedule';
+          document.getElementById('scheduleStatus').innerHTML = 
+            `<div class="error-message">Error: ${error.message}</div>`;
+        })
+        .setupTriggers(frequency);
+    }
+
+    window.onload = function() {
+      google.script.run
+        .withSuccessHandler(progress => {
+          if (progress.hasIncomplete) {
+            document.getElementById('resumeAnalysisBtn').style.display = 'block';
+          }
+        })
+        .getAnalysisProgress();
+
+      google.script.run
+        .withSuccessHandler(status => {
+          if (status.enabled && status.frequency) {
+            document.getElementById('scheduleSelect').value = status.frequency;
+          }
+        })
+        .getTriggerStatus();
+    };
+  </script>
+</body>
+</html>
