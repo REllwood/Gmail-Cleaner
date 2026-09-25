@@ -380,6 +380,7 @@
     let totalEmailsProcessed = 0;
     let totalSenders = 0;
     let totalEmailsCleaned = 0;
+    let failedRules = 0;
     let isAnalysing = false;
     let isCleaning = false;
     let currentScanLimit = 1000;
@@ -647,7 +648,8 @@
       isCleaning = true;
       cancelCleanupRequested = false;
       totalEmailsCleaned = 0;
-      
+      failedRules = 0;
+
       const cleanupBtn = document.getElementById('cleanupBtn');
       const cancelBtn = document.getElementById('cancelCleanupBtn');
       
@@ -675,8 +677,17 @@
       
       google.script.run
         .withSuccessHandler(result => {
+          if (!result.success) {
+            showCleanupError(result.message);
+            return;
+          }
+
+          if (result.error) {
+            failedRules++;
+          }
+
           updateCleanupProgress(result);
-          
+
           if (cancelCleanupRequested) {
             finishCleanup(true);
           } else if (result.isComplete) {
@@ -690,17 +701,23 @@
           }
         })
         .withFailureHandler(error => {
-          isCleaning = false;
-          const cleanupBtn = document.getElementById('cleanupBtn');
-          const cancelBtn = document.getElementById('cancelCleanupBtn');
-          
-          cleanupBtn.style.display = 'block';
-          cancelBtn.style.display = 'none';
-          
-          document.getElementById('cleanupStatus').innerHTML = 
-            `<div class="error-message">Error: ${error.message}</div>`;
+          showCleanupError(`Error: ${error.message}`);
         })
         .runCleanup(ruleIndex, batchStart);
+    }
+
+    function showCleanupError(message) {
+      isCleaning = false;
+      cancelCleanupRequested = false;
+      const cleanupBtn = document.getElementById('cleanupBtn');
+      const cancelBtn = document.getElementById('cancelCleanupBtn');
+
+      cleanupBtn.style.display = 'block';
+      cancelBtn.style.display = 'none';
+      cancelBtn.disabled = false;
+
+      document.getElementById('cleanupStatus').innerHTML =
+        `<div class="error-message">${message}</div>`;
     }
 
     function updateCleanupProgress(result) {
@@ -741,7 +758,12 @@
       } else {
         message = `Cleanup complete! ${totalEmailsCleaned.toLocaleString()} emails processed.`;
       }
-      
+
+      if (failedRules > 0) {
+        message += ` ${failedRules} ${failedRules === 1 ? 'rule' : 'rules'} failed - check the Logs sheet for details.`;
+        messageClass = 'error-message';
+      }
+
       document.getElementById('cleanupStatus').innerHTML = 
         `<div class="${messageClass}">${message}</div>`;
     }
