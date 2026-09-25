@@ -151,6 +151,7 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       if (lastRow > 1) {
         analysisSheet.getRange(2, 1, lastRow - 1, 4).clear();
       }
+      clearAnalysisProgress();
     }
     
     const chunkSize = 50;
@@ -259,6 +260,12 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
     const limitReached = totalEmailsSoFar >= maxEmails;
     const hasMore = !limitReached && threads.length === chunkSize;
     
+    // Saved here, right after the sheet is updated, so a resume carries on
+    // from exactly the data already written
+    if (hasMore) {
+      saveAnalysisProgress({ nextIndex: nextIndex, emailsSoFar: totalEmailsSoFar, scanLimit: maxEmails });
+    }
+    
     return {
       success: true,
       message: limitReached ? `Scan limit reached (${maxEmails.toLocaleString()} emails)` : `Processing...`,
@@ -281,22 +288,31 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
 }
 
 function getAnalysisProgress() {
+  const none = { hasIncomplete: false, lastIndex: 0, emailsSoFar: 0, scanLimit: null };
   try {
-    const scriptProperties = PropertiesService.getScriptProperties();
-    const lastIndex = scriptProperties.getProperty('lastAnalysisIndex');
+    const saved = PropertiesService.getScriptProperties().getProperty('lastAnalysisIndex');
+    if (saved === null) return none;
+    
+    // Older versions saved only the thread index
+    const progress = /^\d+$/.test(saved) ? { nextIndex: Number(saved) } : JSON.parse(saved);
     return {
-      hasIncomplete: lastIndex !== null,
-      lastIndex: parseInt(lastIndex) || 0
+      hasIncomplete: true,
+      lastIndex: progress.nextIndex || 0,
+      emailsSoFar: progress.emailsSoFar || 0,
+      scanLimit: progress.scanLimit || null
     };
   } catch (error) {
-    return { hasIncomplete: false, lastIndex: 0 };
+    return none;
   }
 }
 
-function saveAnalysisProgress(index) {
+/**
+ * @param {{nextIndex: number, emailsSoFar: number, scanLimit: number}} progress
+ */
+function saveAnalysisProgress(progress) {
   try {
     const scriptProperties = PropertiesService.getScriptProperties();
-    scriptProperties.setProperty('lastAnalysisIndex', index.toString());
+    scriptProperties.setProperty('lastAnalysisIndex', JSON.stringify(progress));
   } catch (error) {
     console.error('Failed to save progress:', error);
   }
