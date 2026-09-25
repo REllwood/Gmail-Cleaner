@@ -434,19 +434,7 @@
       totalEmailsProcessed = 0;
       totalSenders = 0;
       
-      const analyseBtn = document.getElementById('analyseBtn');
-      const cancelBtn = document.getElementById('cancelAnalysisBtn');
-      const clearBtn = document.getElementById('clearAnalysisBtn');
-      const resumeBtn = document.getElementById('resumeAnalysisBtn');
-      
-      analyseBtn.style.display = 'none';
-      cancelBtn.style.display = 'block';
-      clearBtn.style.display = 'none';
-      resumeBtn.style.display = 'none';
-      scanLimitInput.disabled = true;
-      
-      document.getElementById('analysisProgressContainer').style.display = 'block';
-      document.getElementById('analysisStatus').innerHTML = '';
+      showAnalysisRunning();
       
       document.getElementById('totalEmailsScanned').textContent = '0';
       document.getElementById('uniqueSendersFound').textContent = '0';
@@ -455,6 +443,28 @@
       document.getElementById('analysisProgressStatus').textContent = 'Scanning...';
       
       processAnalysisBatch(0, true);
+    }
+
+    function showAnalysisRunning() {
+      document.getElementById('analyseBtn').style.display = 'none';
+      document.getElementById('cancelAnalysisBtn').style.display = 'block';
+      document.getElementById('clearAnalysisBtn').style.display = 'none';
+      document.getElementById('resumeAnalysisBtn').style.display = 'none';
+      document.getElementById('scanLimitInput').disabled = true;
+      document.getElementById('analysisProgressContainer').style.display = 'block';
+      document.getElementById('analysisStatus').innerHTML = '';
+    }
+
+    function showAnalysisStopped() {
+      isAnalysing = false;
+      cancelAnalysisRequested = false;
+      
+      const cancelBtn = document.getElementById('cancelAnalysisBtn');
+      document.getElementById('analyseBtn').style.display = 'block';
+      cancelBtn.style.display = 'none';
+      cancelBtn.disabled = false;
+      document.getElementById('clearAnalysisBtn').style.display = 'block';
+      document.getElementById('scanLimitInput').disabled = false;
     }
 
     function cancelAnalysis() {
@@ -515,14 +525,25 @@
       if (isAnalysing) return;
       
       isAnalysing = true;
+      cancelAnalysisRequested = false;
+      showAnalysisRunning();
+      document.getElementById('analysisProgressStatus').textContent = 'Resuming...';
       
       google.script.run
         .withSuccessHandler(progress => {
-          const startIndex = progress.lastIndex || 0;
-          processAnalysisBatch(startIndex, false);
+          // Restore the saved totals and limit, in case the sidebar was reopened
+          const scanLimitInput = document.getElementById('scanLimitInput');
+          currentScanLimit = progress.scanLimit || parseInt(scanLimitInput.value) || 1000;
+          scanLimitInput.value = String(currentScanLimit);
+          totalEmailsProcessed = progress.emailsSoFar || 0;
+          totalSenders = 0;
+          updateAnalysisProgress({ emailsProcessed: 0 });
+          
+          processAnalysisBatch(progress.lastIndex || 0, false);
         })
         .withFailureHandler(error => {
-          isAnalysing = false;
+          showAnalysisStopped();
+          document.getElementById('resumeAnalysisBtn').style.display = 'block';
           document.getElementById('analysisStatus').innerHTML = 
             `<div class="error-message">Error: ${error.message}</div>`;
         })
@@ -538,13 +559,7 @@
       google.script.run
         .withSuccessHandler(result => {
           if (!result.success) {
-            isAnalysing = false;
-            const analyseBtn = document.getElementById('analyseBtn');
-            const cancelBtn = document.getElementById('cancelAnalysisBtn');
-            
-            analyseBtn.style.display = 'block';
-            cancelBtn.style.display = 'none';
-            document.getElementById('scanLimitInput').disabled = false;
+            showAnalysisStopped();
             
             document.getElementById('analysisStatus').innerHTML = 
               `<div class="error-message">Scan stopped: ${result.message}</div>`;
@@ -562,20 +577,13 @@
           } else if (result.limitReached) {
             finishAnalysis(true, false);
           } else if (result.hasMore) {
-            google.script.run.saveAnalysisProgress(result.nextIndex);
             processAnalysisBatch(result.nextIndex, false);
           } else {
             finishAnalysis(false, false);
           }
         })
         .withFailureHandler(error => {
-          isAnalysing = false;
-          const analyseBtn = document.getElementById('analyseBtn');
-          const cancelBtn = document.getElementById('cancelAnalysisBtn');
-          
-          analyseBtn.style.display = 'block';
-          cancelBtn.style.display = 'none';
-          document.getElementById('scanLimitInput').disabled = false;
+          showAnalysisStopped();
           
           document.getElementById('analysisStatus').innerHTML = 
             `<div class="error-message">System Error: ${error.message}</div>`;
@@ -610,18 +618,7 @@
     }
 
     function finishAnalysis(limitReached = false, wasCancelled = false) {
-      isAnalysing = false;
-      cancelAnalysisRequested = false;
-      
-      const analyseBtn = document.getElementById('analyseBtn');
-      const cancelBtn = document.getElementById('cancelAnalysisBtn');
-      const clearBtn = document.getElementById('clearAnalysisBtn');
-      
-      analyseBtn.style.display = 'block';
-      cancelBtn.style.display = 'none';
-      cancelBtn.disabled = false;
-      clearBtn.style.display = 'block';
-      document.getElementById('scanLimitInput').disabled = false;
+      showAnalysisStopped();
       
       google.script.run.clearAnalysisProgress();
       
