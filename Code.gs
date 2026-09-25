@@ -380,7 +380,8 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
           hasMoreInRule: false,
           hasMoreRules: (ruleIndex + 1) < activeRules.length,
           currentRuleName: `${ruleType}: ${value}`,
-          totalRules: activeRules.length
+          totalRules: activeRules.length,
+          nextRuleIndex: ruleIndex + 1
         };
       }
       
@@ -428,7 +429,8 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
         hasMoreInRule: false,
         hasMoreRules: (ruleIndex + 1) < activeRules.length,
         error: error.message,
-        totalRules: activeRules.length
+        totalRules: activeRules.length,
+        nextRuleIndex: ruleIndex + 1
       };
     }
     
