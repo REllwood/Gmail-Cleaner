@@ -579,12 +579,20 @@ function logAction(action, details, count) {
   }
 }
 
+// Triggers don't expose their schedule, so setupTriggers records it here
+const SCHEDULE_FREQUENCY_KEY = 'scheduleFrequency';
+
 /**
  * Sets up scheduled triggers for automation
  * @param {string} frequency - 'daily', 'weekly', or 'none'
  */
 function setupTriggers(frequency) {
+  if (['daily', 'weekly', 'none'].indexOf(frequency) === -1) {
+    return { success: false, message: 'Invalid frequency. Use "daily", "weekly", or "none".' };
+  }
+  
   try {
+    const userProperties = PropertiesService.getUserProperties();
     const triggers = ScriptApp.getProjectTriggers();
     triggers.forEach(trigger => {
       if (trigger.getHandlerFunction() === 'runScheduledCleanup') {
@@ -593,6 +601,7 @@ function setupTriggers(frequency) {
     });
     
     if (frequency === 'none') {
+      userProperties.deleteProperty(SCHEDULE_FREQUENCY_KEY);
       return { success: true, message: 'Automated cleanup disabled.' };
     }
     
@@ -600,11 +609,10 @@ function setupTriggers(frequency) {
     
     if (frequency === 'daily') {
       trigger.timeBased().everyDays(1).atHour(2).create();
-    } else if (frequency === 'weekly') {
-      trigger.timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(2).create();
     } else {
-      return { success: false, message: 'Invalid frequency. Use "daily", "weekly", or "none".' };
+      trigger.timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(2).create();
     }
+    userProperties.setProperty(SCHEDULE_FREQUENCY_KEY, frequency);
     
     return {
       success: true,
@@ -717,18 +725,19 @@ function getRecentLogs(limit = 10) {
   }
 }
 
+/**
+ * Reports whether automated cleanup is on, and how often it runs
+ * @return {{enabled: boolean, frequency: string|null}} frequency is null for
+ *     a schedule set up before it was recorded
+ */
 function getTriggerStatus() {
   const triggers = ScriptApp.getProjectTriggers();
   const cleanupTrigger = triggers.find(t => t.getHandlerFunction() === 'runScheduledCleanup');
   
-  if (!cleanupTrigger) {
+  if (!cleanupTrigger || cleanupTrigger.getEventType() !== ScriptApp.EventType.CLOCK) {
     return { enabled: false, frequency: 'none' };
   }
   
-  const eventType = cleanupTrigger.getEventType();
-  if (eventType === ScriptApp.EventType.CLOCK) {
-    return { enabled: true, frequency: 'daily' };
-  }
-  
-  return { enabled: false, frequency: 'none' };
+  const frequency = PropertiesService.getUserProperties().getProperty(SCHEDULE_FREQUENCY_KEY);
+  return { enabled: true, frequency: frequency };
 }
