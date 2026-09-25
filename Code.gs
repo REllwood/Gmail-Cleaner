@@ -306,26 +306,42 @@ function clearAnalysisData() {
   }
 }
 
+// Leaves out mail the action has already been applied to, so each batch drops
+// out of the results and the next search can start from the top again
+const ACTION_FILTERS = {
+  'Trash': '-in:trash',
+  'Archive': 'in:inbox',
+  'Mark Read': 'is:unread'
+};
+
 /**
  * Builds the Gmail search query for a rule
  * @param {string} ruleType - 'Sender', 'Subject', or 'Content'
  * @param {string} value - The rule's value from the Rules sheet
- * @return {string|null} The query, or null for an unknown rule type or blank value
+ * @param {string} action - 'Trash', 'Archive', or 'Mark Read'
+ * @return {string|null} The query, or null for an unknown rule type or action, or a blank value
  */
-function buildSearchQuery(ruleType, value) {
+function buildSearchQuery(ruleType, value, action) {
   const text = String(value).trim();
-  if (!text) return null;
+  const actionFilter = ACTION_FILTERS[action];
+  if (!text || !actionFilter) return null;
   
+  let query;
   switch (ruleType) {
     case 'Sender':
-      return `from:${quoteSearchTerm(text)}`;
+      query = `from:${quoteSearchTerm(text)}`;
+      break;
     case 'Subject':
-      return `subject:${quoteSearchTerm(text)}`;
+      query = `subject:${quoteSearchTerm(text)}`;
+      break;
     case 'Content':
-      return text;
+      query = `(${text})`;
+      break;
     default:
       return null;
   }
+  
+  return `${query} ${actionFilter}`;
 }
 
 /**
@@ -338,11 +354,13 @@ function quoteSearchTerm(text) {
 }
 
 /**
- * Runs cleanup in batches to handle large numbers of emails
+ * Runs cleanup in batches to handle large numbers of emails. Each batch
+ * searches from the top, because the previous batch has already dropped
+ * out of the results.
  * @param {number} ruleIndex - Which rule to process (0-based)
- * @param {number} batchStart - Start index for this batch
+ * @param {number} batchNumber - How many batches of this rule have already run
  */
-function runCleanup(ruleIndex = 0, batchStart = 0) {
+function runCleanup(ruleIndex = 0, batchNumber = 0) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const rulesSheet = ss.getSheetByName('Rules');
@@ -371,7 +389,7 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
         message: 'All rules processed!',
         isComplete: true,
         ruleIndex: ruleIndex,
-        batchStart: 0
+        batchNumber: 0
       };
     }
     
@@ -379,16 +397,16 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
     const [ruleType, value, action, status] = rule;
     
     try {
-      const searchQuery = buildSearchQuery(ruleType, value);
+      const searchQuery = buildSearchQuery(ruleType, value, action);
       if (!searchQuery) {
         return runCleanup(ruleIndex + 1, 0);
       }
       
       const batchSize = 50;
-      const threads = GmailApp.search(searchQuery, batchStart, batchSize);
+      const threads = GmailApp.search(searchQuery, 0, batchSize);
       
       if (threads.length === 0) {
-        if (batchStart === 0) {
+        if (batchNumber === 0) {
           logAction(`Cleanup Rule ${originalIndex + 1}`, `${action} - ${ruleType}: ${value} - No emails found`, 0);
         }
         
@@ -396,7 +414,7 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
           success: true,
           message: `Rule ${ruleIndex + 1}/${activeRules.length} complete`,
           ruleIndex: ruleIndex + 1,
-          batchStart: 0,
+          batchNumber: 0,
           emailsProcessed: 0,
           hasMoreInRule: false,
           hasMoreRules: (ruleIndex + 1) < activeRules.length,
@@ -418,7 +436,7 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
           break;
       }
       
-      if (batchStart === 0) {
+      if (batchNumber === 0) {
         logAction(`Cleanup Rule ${originalIndex + 1}`, `${action} - ${ruleType}: ${value} - Started`, threads.length);
       }
       
@@ -428,7 +446,7 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
         success: true,
         message: `Processing rule ${ruleIndex + 1}/${activeRules.length}...`,
         ruleIndex: ruleIndex,
-        batchStart: hasMoreInRule ? batchStart + batchSize : 0,
+        batchNumber: hasMoreInRule ? batchNumber + 1 : 0,
         emailsProcessed: threads.length,
         hasMoreInRule: hasMoreInRule,
         hasMoreRules: !hasMoreInRule && ((ruleIndex + 1) < activeRules.length),
@@ -445,7 +463,7 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
         success: true,
         message: `Rule ${ruleIndex + 1} failed, continuing...`,
         ruleIndex: ruleIndex + 1,
-        batchStart: 0,
+        batchNumber: 0,
         emailsProcessed: 0,
         hasMoreInRule: false,
         hasMoreRules: (ruleIndex + 1) < activeRules.length,
@@ -461,7 +479,7 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
       message: `Error during cleanup: ${error.message}`,
       canResume: true,
       ruleIndex: ruleIndex,
-      batchStart: batchStart
+      batchNumber: batchNumber
     };
   }
 }
@@ -553,7 +571,7 @@ function runScheduledCleanup() {
       }
       
       try {
-        const searchQuery = buildSearchQuery(ruleType, value);
+        const searchQuery = buildSearchQuery(ruleType, value, action);
         if (!searchQuery) return;
         
         const threads = GmailApp.search(searchQuery, 0, 100);

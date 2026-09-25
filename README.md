@@ -136,6 +136,8 @@ Sender and Subject values that contain spaces are matched as an exact phrase, so
 - **Archive**: Remove from inbox (but keep in archive)
 - **Mark Read**: Mark as read (but don't move)
 
+Each action only picks up emails it hasn't already handled: Trash ignores anything already in the trash, Archive only looks at your inbox, and Mark Read only looks at unread emails.
+
 **Status:**
 - **Active**: Rule will be applied
 - **Paused**: Rule will be skipped
