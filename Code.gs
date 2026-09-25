@@ -115,12 +115,19 @@ function setupSheets() {
   };
 }
 
+const SCAN_CHUNK_SIZE = 50;
+
+// Each scanInbox call keeps reading chunks for up to this long before it
+// writes to the sheet and reports back, so a long scan needs far fewer sheet
+// reads and writes while the sidebar still updates every few seconds
+const SCAN_CALL_BUDGET_MS = 10 * 1000;
+
 /**
- * Scans the inbox in small batches for progress updates
- * @param {number} startIndex - Inbox thread to start from (0, 50, 100, etc.)
+ * Scans the inbox in chunks, reporting back to the sidebar every few seconds
+ * @param {number} startIndex - Inbox thread to start from
  * @param {boolean} clearSheet - Whether to clear existing data first
  * @param {number} maxEmails - Maximum emails to scan (default: 1000)
- * @param {number} emailsSoFar - Emails already scanned in earlier batches
+ * @param {number} emailsSoFar - Emails already scanned in earlier calls
  */
 function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_LIMIT, emailsSoFar = 0) {
   // Ensure the counts are valid numbers
@@ -146,7 +153,8 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       };
     }
     
-    if (clearSheet && startIndex === 0) {
+    const isFreshScan = clearSheet && startIndex === 0;
+    if (isFreshScan) {
       const lastRow = analysisSheet.getLastRow();
       if (lastRow > 1) {
         analysisSheet.getRange(2, 1, lastRow - 1, 4).clear();
@@ -154,79 +162,62 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       clearAnalysisProgress();
     }
     
-    const chunkSize = 50;
-    const threads = GmailApp.getInboxThreads(startIndex, chunkSize);
+    const startTime = Date.now();
+    let senderMap = null;
+    let nextIndex = startIndex;
+    let emailsInThisCall = 0;
+    let lastChunkFull = false;
+    const limitHit = () => emailsSoFar + emailsInThisCall >= maxEmails;
     
-    // Check if we found any threads
-    if (!threads || threads.length === 0) {
-      if (startIndex === 0) {
-        return {
-          success: true,
-          message: 'Inbox is empty! No emails found to analyse.',
-          emailsProcessed: 0,
-          hasMore: false,
-          nextIndex: startIndex
-        };
+    do {
+      const threads = GmailApp.getInboxThreads(nextIndex, SCAN_CHUNK_SIZE);
+      lastChunkFull = threads.length === SCAN_CHUNK_SIZE;
+      if (threads.length === 0) break;
+      
+      // Only read the sheet once there's something to add to it
+      if (!senderMap) {
+        senderMap = isFreshScan ? {} : readSenderMap(analysisSheet);
       }
       
+      // The limit counts emails, so stop part-way through a chunk (or a
+      // thread) once it's reached
+      for (const messages of GmailApp.getMessagesForThreads(threads)) {
+        if (limitHit()) break;
+        nextIndex++;
+        
+        for (const message of messages) {
+          if (limitHit()) break;
+          emailsInThisCall++;
+          
+          const sender = message.getFrom();
+          const subject = message.getSubject();
+          const date = message.getDate();
+          
+          const emailMatch = sender.match(/<(.+?)>/) || [null, sender];
+          const email = emailMatch[1] || sender;
+          
+          if (!senderMap[email]) {
+            senderMap[email] = { count: 0, lastReceived: date, sampleSubject: subject };
+          }
+          
+          senderMap[email].count++;
+          if (!senderMap[email].lastReceived || date > senderMap[email].lastReceived) {
+            senderMap[email].lastReceived = date;
+            senderMap[email].sampleSubject = subject;
+          }
+        }
+      }
+    } while (lastChunkFull && !limitHit() && Date.now() - startTime < SCAN_CALL_BUDGET_MS);
+    
+    // No threads found at all in this call
+    if (!senderMap) {
       return {
         success: true,
-        message: 'All emails analysed!',
+        message: startIndex === 0 ? 'Inbox is empty! No emails found to analyse.' : 'All emails analysed!',
         emailsProcessed: 0,
         hasMore: false,
         nextIndex: startIndex
       };
-    }
-    
-    const senderMap = {};
-    
-    if (!clearSheet || startIndex > 0) {
-      const lastRow = analysisSheet.getLastRow();
-      if (lastRow > 1) {
-        const existingData = analysisSheet.getRange(2, 1, lastRow - 1, 4).getValues();
-        existingData.forEach(row => {
-          if (row[0]) {
-            senderMap[row[0]] = {
-              count: row[1] || 0,
-              lastReceived: readDateCell(row[2]),
-              sampleSubject: row[3] || ''
-            };
-          }
-        });
-      }
-    }
-    
-    // The limit counts emails, so stop part-way through a batch (or a thread)
-    // once it's reached
-    let emailsInThisChunk = 0;
-    let threadsScanned = 0;
-    const limitHit = () => emailsSoFar + emailsInThisChunk >= maxEmails;
-    
-    for (const messages of GmailApp.getMessagesForThreads(threads)) {
-      if (limitHit()) break;
-      threadsScanned++;
-      
-      for (const message of messages) {
-        if (limitHit()) break;
-        emailsInThisChunk++;
-        
-        const sender = message.getFrom();
-        const subject = message.getSubject();
-        const date = message.getDate();
-        
-        const emailMatch = sender.match(/<(.+?)>/) || [null, sender];
-        const email = emailMatch[1] || sender;
-        
-        if (!senderMap[email]) {
-          senderMap[email] = { count: 0, lastReceived: date, sampleSubject: subject };
-        }
-        
-        senderMap[email].count++;
-        if (!senderMap[email].lastReceived || date > senderMap[email].lastReceived) {
-          senderMap[email].lastReceived = date;
-          senderMap[email].sampleSubject = subject;
-        }
-      }
     }
     
     const senderArray = Object.keys(senderMap).map(email => ({
@@ -258,10 +249,9 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       analysisSheet.getRange(2, 3, dataToWrite.length, 1).setNumberFormat('yyyy-mm-dd hh:mm');
     }
     
-    const nextIndex = startIndex + threadsScanned;
-    const totalEmailsSoFar = emailsSoFar + emailsInThisChunk;
+    const totalEmailsSoFar = emailsSoFar + emailsInThisCall;
     const limitReached = totalEmailsSoFar >= maxEmails;
-    const hasMore = !limitReached && threads.length === chunkSize;
+    const hasMore = !limitReached && lastChunkFull;
     
     // Saved here, right after the sheet is updated, so a resume carries on
     // from exactly the data already written
@@ -272,7 +262,7 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
     return {
       success: true,
       message: limitReached ? `Scan limit reached (${maxEmails.toLocaleString()} emails)` : `Processing...`,
-      emailsProcessed: emailsInThisChunk,
+      emailsProcessed: emailsInThisCall,
       totalEmailsSoFar: totalEmailsSoFar,
       senderCount: senderArray.length,
       hasMore: hasMore,
@@ -288,6 +278,27 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       resumeIndex: startIndex
     };
   }
+}
+
+/**
+ * Loads the sender totals already in the Analysis sheet
+ * @return {Object} Map of sender email to { count, lastReceived, sampleSubject }
+ */
+function readSenderMap(analysisSheet) {
+  const senderMap = {};
+  const lastRow = analysisSheet.getLastRow();
+  if (lastRow > 1) {
+    analysisSheet.getRange(2, 1, lastRow - 1, 4).getValues().forEach(row => {
+      if (row[0]) {
+        senderMap[row[0]] = {
+          count: row[1] || 0,
+          lastReceived: readDateCell(row[2]),
+          sampleSubject: row[3] || ''
+        };
+      }
+    });
+  }
+  return senderMap;
 }
 
 /**
