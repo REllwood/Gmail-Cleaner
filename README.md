@@ -129,6 +129,8 @@ The analysis scans your inbox to count emails by sender. You can control how man
 - **Subject**: Match emails with specific text in the subject
 - **Content**: Match using Gmail search syntax (e.g., "has:attachment")
 
+Sender and Subject values that contain spaces are matched as an exact phrase, so `Your order has shipped` only matches subjects containing that phrase, not every email that happens to mention those words.
+
 **Actions:**
 - **Trash**: Move emails to trash
 - **Archive**: Remove from inbox (but keep in archive)

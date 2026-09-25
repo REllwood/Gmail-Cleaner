@@ -307,6 +307,37 @@ function clearAnalysisData() {
 }
 
 /**
+ * Builds the Gmail search query for a rule
+ * @param {string} ruleType - 'Sender', 'Subject', or 'Content'
+ * @param {string} value - The rule's value from the Rules sheet
+ * @return {string|null} The query, or null for an unknown rule type or blank value
+ */
+function buildSearchQuery(ruleType, value) {
+  const text = String(value).trim();
+  if (!text) return null;
+  
+  switch (ruleType) {
+    case 'Sender':
+      return `from:${quoteSearchTerm(text)}`;
+    case 'Subject':
+      return `subject:${quoteSearchTerm(text)}`;
+    case 'Content':
+      return text;
+    default:
+      return null;
+  }
+}
+
+/**
+ * Quotes a value containing spaces or brackets so Gmail matches it as one
+ * phrase in the field, rather than matching the extra words anywhere
+ */
+function quoteSearchTerm(text) {
+  const clean = text.replace(/"/g, '');
+  return /[\s(){}]/.test(clean) ? `"${clean}"` : clean;
+}
+
+/**
  * Runs cleanup in batches to handle large numbers of emails
  * @param {number} ruleIndex - Which rule to process (0-based)
  * @param {number} batchStart - Start index for this batch
@@ -348,19 +379,9 @@ function runCleanup(ruleIndex = 0, batchStart = 0) {
     const [ruleType, value, action, status] = rule;
     
     try {
-      let searchQuery = '';
-      switch (ruleType) {
-        case 'Sender':
-          searchQuery = `from:${value}`;
-          break;
-        case 'Subject':
-          searchQuery = `subject:${value}`;
-          break;
-        case 'Content':
-          searchQuery = value;
-          break;
-        default:
-          return runCleanup(ruleIndex + 1, 0);
+      const searchQuery = buildSearchQuery(ruleType, value);
+      if (!searchQuery) {
+        return runCleanup(ruleIndex + 1, 0);
       }
       
       const batchSize = 50;
@@ -532,20 +553,8 @@ function runScheduledCleanup() {
       }
       
       try {
-        let searchQuery = '';
-        switch (ruleType) {
-          case 'Sender':
-            searchQuery = `from:${value}`;
-            break;
-          case 'Subject':
-            searchQuery = `subject:${value}`;
-            break;
-          case 'Content':
-            searchQuery = value;
-            break;
-          default:
-            return;
-        }
+        const searchQuery = buildSearchQuery(ruleType, value);
+        if (!searchQuery) return;
         
         const threads = GmailApp.search(searchQuery, 0, 100);
         
