@@ -585,11 +585,15 @@ const SCHEDULE_FREQUENCY_KEY = 'scheduleFrequency';
 /**
  * Sets up scheduled triggers for automation
  * @param {string} frequency - 'daily', 'weekly', or 'none'
+ * @param {string} timeZone - IANA time zone to run in, e.g. 'Australia/Sydney'.
+ *     Falls back to the script's time zone if missing or invalid.
  */
-function setupTriggers(frequency) {
+function setupTriggers(frequency, timeZone) {
   if (['daily', 'weekly', 'none'].indexOf(frequency) === -1) {
     return { success: false, message: 'Invalid frequency. Use "daily", "weekly", or "none".' };
   }
+  
+  const zone = isValidTimeZone(timeZone) ? timeZone : Session.getScriptTimeZone();
   
   try {
     const userProperties = PropertiesService.getUserProperties();
@@ -608,15 +612,15 @@ function setupTriggers(frequency) {
     const trigger = ScriptApp.newTrigger('runScheduledCleanup');
     
     if (frequency === 'daily') {
-      trigger.timeBased().everyDays(1).atHour(2).create();
+      trigger.timeBased().everyDays(1).atHour(2).inTimezone(zone).create();
     } else {
-      trigger.timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(2).create();
+      trigger.timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.MONDAY).atHour(2).inTimezone(zone).create();
     }
     userProperties.setProperty(SCHEDULE_FREQUENCY_KEY, frequency);
     
     return {
       success: true,
-      message: `Automated cleanup scheduled to run ${frequency} at 2:00 AM.`
+      message: `Automated cleanup scheduled to run ${frequency} at 2:00 AM (${zone} time).`
     };
     
   } catch (error) {
@@ -722,6 +726,16 @@ function getRecentLogs(limit = 10) {
       logs: [],
       message: error.message
     };
+  }
+}
+
+function isValidTimeZone(timeZone) {
+  if (typeof timeZone !== 'string' || !timeZone) return false;
+  try {
+    Intl.DateTimeFormat('en-AU', { timeZone: timeZone });
+    return true;
+  } catch (error) {
+    return false;
   }
 }
 
