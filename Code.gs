@@ -419,9 +419,9 @@ function cleanupRuleBatch(rule) {
  * searches from the top, because the previous batch has already dropped
  * out of the results.
  * @param {number} ruleIndex - Which rule to process (0-based)
- * @param {number} batchNumber - How many batches of this rule have already run
+ * @param {number} ruleTotal - Emails this rule has already processed in this run
  */
-function runCleanup(ruleIndex = 0, batchNumber = 0) {
+function runCleanup(ruleIndex = 0, ruleTotal = 0) {
   try {
     const { rules: activeRules, error } = getActiveRules();
     if (error) {
@@ -434,12 +434,17 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
         message: 'All rules processed!',
         isComplete: true,
         ruleIndex: ruleIndex,
-        batchNumber: 0
+        ruleTotal: 0
       };
     }
     
     const rule = activeRules[ruleIndex];
     const { ruleType, value, action, ruleNumber } = rule;
+    const logRuleTotal = total => logAction(
+      `Cleanup Rule ${ruleNumber}`,
+      `${action} - ${ruleType}: ${value}${total === 0 ? ' - No emails found' : ''}`,
+      total
+    );
     
     try {
       const processed = cleanupRuleBatch(rule);
@@ -448,15 +453,13 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
       }
       
       if (processed === 0) {
-        if (batchNumber === 0) {
-          logAction(`Cleanup Rule ${ruleNumber}`, `${action} - ${ruleType}: ${value} - No emails found`, 0);
-        }
+        logRuleTotal(ruleTotal);
         
         return {
           success: true,
           message: `Rule ${ruleIndex + 1}/${activeRules.length} complete`,
           ruleIndex: ruleIndex + 1,
-          batchNumber: 0,
+          ruleTotal: 0,
           emailsProcessed: 0,
           hasMoreInRule: false,
           hasMoreRules: (ruleIndex + 1) < activeRules.length,
@@ -466,17 +469,16 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
         };
       }
       
-      if (batchNumber === 0) {
-        logAction(`Cleanup Rule ${ruleNumber}`, `${action} - ${ruleType}: ${value} - Started`, processed);
-      }
-      
       const hasMoreInRule = processed === CLEANUP_BATCH_SIZE;
+      if (!hasMoreInRule) {
+        logRuleTotal(ruleTotal + processed);
+      }
       
       return {
         success: true,
         message: `Processing rule ${ruleIndex + 1}/${activeRules.length}...`,
         ruleIndex: ruleIndex,
-        batchNumber: hasMoreInRule ? batchNumber + 1 : 0,
+        ruleTotal: hasMoreInRule ? ruleTotal + processed : 0,
         emailsProcessed: processed,
         hasMoreInRule: hasMoreInRule,
         hasMoreRules: !hasMoreInRule && ((ruleIndex + 1) < activeRules.length),
@@ -487,13 +489,13 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
       };
       
     } catch (error) {
-      logAction(`Cleanup Rule ${ruleNumber}`, `Error: ${error.message}`, 0);
+      logAction(`Cleanup Rule ${ruleNumber}`, `Error: ${error.message}`, ruleTotal);
       
       return {
         success: true,
         message: `Rule ${ruleIndex + 1} failed, continuing...`,
         ruleIndex: ruleIndex + 1,
-        batchNumber: 0,
+        ruleTotal: 0,
         emailsProcessed: 0,
         hasMoreInRule: false,
         hasMoreRules: (ruleIndex + 1) < activeRules.length,
@@ -509,9 +511,22 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
       message: `Error during cleanup: ${error.message}`,
       canResume: true,
       ruleIndex: ruleIndex,
-      batchNumber: batchNumber
+      ruleTotal: ruleTotal
     };
   }
+}
+
+/**
+ * Logs the overall result of a cleanup run from the sidebar
+ * @param {number} totalEmails - Emails processed across all rules
+ * @param {boolean} wasCancelled - Whether the run was cancelled part-way
+ */
+function logCleanupRun(totalEmails, wasCancelled) {
+  logAction(
+    wasCancelled ? 'Cleanup Cancelled' : 'Cleanup Complete',
+    `Processed ${totalEmails} emails`,
+    totalEmails
+  );
 }
 
 function logAction(action, details, count) {

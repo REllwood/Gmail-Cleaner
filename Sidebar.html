@@ -669,7 +669,7 @@
       document.getElementById('cancelCleanupBtn').disabled = true;
     }
 
-    function processCleanupBatch(ruleIndex, batchNumber) {
+    function processCleanupBatch(ruleIndex, ruleTotal) {
       if (cancelCleanupRequested) {
         finishCleanup(true);
         return;
@@ -693,7 +693,7 @@
           } else if (result.isComplete) {
             finishCleanup(false);
           } else if (result.hasMoreInRule) {
-            processCleanupBatch(result.ruleIndex, result.batchNumber);
+            processCleanupBatch(result.ruleIndex, result.ruleTotal);
           } else if (result.hasMoreRules) {
             processCleanupBatch(result.nextRuleIndex, 0);
           } else {
@@ -703,7 +703,7 @@
         .withFailureHandler(error => {
           showCleanupError(`Error: ${error.message}`);
         })
-        .runCleanup(ruleIndex, batchNumber);
+        .runCleanup(ruleIndex, ruleTotal);
     }
 
     function showCleanupError(message) {
@@ -748,6 +748,8 @@
       cleanupBtn.style.display = 'block';
       cancelBtn.style.display = 'none';
       cancelBtn.disabled = false;
+      
+      google.script.run.logCleanupRun(totalEmailsCleaned, wasCancelled);
       
       let message = '';
       let messageClass = 'success-message';
