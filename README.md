@@ -140,6 +140,8 @@ Sender and Subject values that contain spaces are matched as an exact phrase, so
 
 Each action only picks up emails it hasn't already handled: Trash ignores anything already in the trash, Archive only looks at your inbox, and Mark Read only looks at unread emails.
 
+> **Actions apply to the whole conversation.** Gmail matches rules against conversations (threads), so if any one email in a conversation matches, the whole conversation is trashed, archived or marked as read, including replies from other people and your own sent emails.
+
 **Status:**
 - **Active**: Rule will be applied
 - **Paused**: Rule will be skipped
@@ -185,6 +187,7 @@ Each scheduled run works through every active rule until nothing is left to clea
 3. **Check Logs**: Review the Logs sheet regularly to ensure rules are working correctly
 4. **Backup Important Emails**: Consider backing up important emails before running bulk cleanup
 5. **Use Specific Rules**: The more specific your rules, the better results you'll get
+6. **Mind Conversations**: Actions affect the whole conversation an email belongs to, so avoid Sender rules for people you actually talk to, or you'll lose the whole back-and-forth
 
 ### Permissions
 
