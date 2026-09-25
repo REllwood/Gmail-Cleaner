@@ -823,6 +823,9 @@
         .withSuccessHandler(status => {
           if (status.enabled && status.frequency) {
             document.getElementById('scheduleSelect').value = status.frequency;
+          } else if (status.enabled) {
+            document.getElementById('scheduleStatus').innerHTML = 
+              '<div class="info-text">Automated cleanup is on. Choose its schedule and click Update Schedule to confirm it.</div>';
           }
         })
         .getTriggerStatus();
