@@ -17,9 +17,9 @@ function onOpen() {
 }
 
 function showSidebar() {
+  // Sidebars are always 300px wide, so there's no width to set
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setTitle('Gmail Cleaner')
-    .setWidth(800);
+    .setTitle('Gmail Cleaner');
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
