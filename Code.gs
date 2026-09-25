@@ -188,7 +188,7 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
           if (row[0]) {
             senderMap[row[0]] = {
               count: row[1] || 0,
-              lastReceived: new Date(row[2]) || new Date(),
+              lastReceived: readDateCell(row[2]),
               sampleSubject: row[3] || ''
             };
           }
@@ -222,7 +222,7 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
         }
         
         senderMap[email].count++;
-        if (date > senderMap[email].lastReceived) {
+        if (!senderMap[email].lastReceived || date > senderMap[email].lastReceived) {
           senderMap[email].lastReceived = date;
           senderMap[email].sampleSubject = subject;
         }
@@ -243,16 +243,19 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       analysisSheet.getRange(2, 1, lastRow - 1, 4).clear();
     }
     
+    // Dates are written as real dates rather than text, so they read back
+    // unchanged whatever the sheet's time zone
     const dataToWrite = senderArray.map(item => [
       item.email,
       item.count,
-      Utilities.formatDate(item.lastReceived, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+      item.lastReceived || '',
       item.sampleSubject
     ]);
     
     if (dataToWrite.length > 0) {
       analysisSheet.getRange(2, 1, dataToWrite.length, 4).setValues(dataToWrite);
       analysisSheet.getRange(2, 2, dataToWrite.length, 1).setNumberFormat('#,##0');
+      analysisSheet.getRange(2, 3, dataToWrite.length, 1).setNumberFormat('yyyy-mm-dd hh:mm');
     }
     
     const nextIndex = startIndex + threadsScanned;
@@ -285,6 +288,16 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       resumeIndex: startIndex
     };
   }
+}
+
+/**
+ * Reads a Last Received cell back as a Date
+ * @return {Date|null} null if the cell is empty or not a readable date
+ */
+function readDateCell(value) {
+  if (value === '' || value === null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 function getAnalysisProgress() {
