@@ -92,6 +92,8 @@ Only follow these steps if you didn't use the template above and want to install
 
 ## How to Use
 
+**Tip:** the **Analyse Inbox Now** and **Run Cleanup Now** items in the Gmail Cleaner menu open the sidebar and start that job straight away.
+
 ### Analysing Your Inbox
 
 The analysis scans your inbox to count emails by sender. You can control how many emails to scan each run.

@@ -802,8 +802,18 @@
 
     window.onload = function() {
       google.script.run
+        .withSuccessHandler(action => {
+          if (action === 'analyse') {
+            runAnalysis();
+          } else if (action === 'cleanup') {
+            runCleanup();
+          }
+        })
+        .takePendingSidebarAction();
+
+      google.script.run
         .withSuccessHandler(progress => {
-          if (progress.hasIncomplete) {
+          if (progress.hasIncomplete && !isAnalysing) {
             document.getElementById('resumeAnalysisBtn').style.display = 'block';
           }
         })
