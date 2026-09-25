@@ -164,8 +164,7 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
     }
     
     let emailsInThisChunk = 0;
-    threads.forEach(thread => {
-      const messages = thread.getMessages();
+    GmailApp.getMessagesForThreads(threads).forEach(messages => {
       emailsInThisChunk += messages.length;
       
       messages.forEach(message => {
@@ -397,16 +396,18 @@ function cleanupRuleBatch(rule) {
   if (!searchQuery) return null;
   
   const threads = GmailApp.search(searchQuery, 0, CLEANUP_BATCH_SIZE);
+  if (threads.length === 0) return 0;
   
+  // One call per batch instead of one per thread
   switch (rule.action) {
     case 'Trash':
-      threads.forEach(thread => thread.moveToTrash());
+      GmailApp.moveThreadsToTrash(threads);
       break;
     case 'Archive':
-      threads.forEach(thread => thread.moveToArchive());
+      GmailApp.moveThreadsToArchive(threads);
       break;
     case 'Mark Read':
-      threads.forEach(thread => thread.markRead());
+      GmailApp.markThreadsRead(threads);
       break;
   }
   
