@@ -669,7 +669,7 @@
       document.getElementById('cancelCleanupBtn').disabled = true;
     }
 
-    function processCleanupBatch(ruleIndex, batchStart) {
+    function processCleanupBatch(ruleIndex, batchNumber) {
       if (cancelCleanupRequested) {
         finishCleanup(true);
         return;
@@ -693,7 +693,7 @@
           } else if (result.isComplete) {
             finishCleanup(false);
           } else if (result.hasMoreInRule) {
-            processCleanupBatch(result.ruleIndex, result.batchStart);
+            processCleanupBatch(result.ruleIndex, result.batchNumber);
           } else if (result.hasMoreRules) {
             processCleanupBatch(result.nextRuleIndex, 0);
           } else {
@@ -703,7 +703,7 @@
         .withFailureHandler(error => {
           showCleanupError(`Error: ${error.message}`);
         })
-        .runCleanup(ruleIndex, batchStart);
+        .runCleanup(ruleIndex, batchNumber);
     }
 
     function showCleanupError(message) {
