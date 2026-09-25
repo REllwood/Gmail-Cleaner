@@ -353,6 +353,66 @@ function quoteSearchTerm(text) {
   return /[\s(){}]/.test(clean) ? `"${clean}"` : clean;
 }
 
+const CLEANUP_BATCH_SIZE = 50;
+
+// Scheduled runs stop starting new batches after this long, to stay inside
+// Apps Script's 6-minute execution limit
+const SCHEDULED_TIME_BUDGET_MS = 5 * 60 * 1000;
+
+/**
+ * Reads the active rules from the Rules sheet
+ * @return {{rules: Array<Object>}|{error: string}} The rules, or why there are none
+ */
+function getActiveRules() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const rulesSheet = ss.getSheetByName('Rules');
+  
+  if (!rulesSheet) {
+    return { error: 'Rules sheet not found. Please run Setup Sheets first.' };
+  }
+  
+  const lastRow = rulesSheet.getLastRow();
+  if (lastRow <= 1) {
+    return { error: 'No rules found. Please add rules to the Rules sheet.' };
+  }
+  
+  const rules = rulesSheet.getRange(2, 1, lastRow - 1, 4).getValues()
+    .map(([ruleType, value, action, status], idx) => ({ ruleType, value, action, status, ruleNumber: idx + 1 }))
+    .filter(rule => rule.status === 'Active' && rule.value && rule.action);
+  
+  if (rules.length === 0) {
+    return { error: 'No active rules found. Please add active rules to the Rules sheet.' };
+  }
+  
+  return { rules: rules };
+}
+
+/**
+ * Applies a rule's action to the next batch of matching threads
+ * @param {Object} rule - A rule from getActiveRules()
+ * @return {number|null} Threads processed, or null if the rule can't be run
+ */
+function cleanupRuleBatch(rule) {
+  const searchQuery = buildSearchQuery(rule.ruleType, rule.value, rule.action);
+  if (!searchQuery) return null;
+  
+  const threads = GmailApp.search(searchQuery, 0, CLEANUP_BATCH_SIZE);
+  
+  switch (rule.action) {
+    case 'Trash':
+      threads.forEach(thread => thread.moveToTrash());
+      break;
+    case 'Archive':
+      threads.forEach(thread => thread.moveToArchive());
+      break;
+    case 'Mark Read':
+      threads.forEach(thread => thread.markRead());
+      break;
+  }
+  
+  return threads.length;
+}
+
 /**
  * Runs cleanup in batches to handle large numbers of emails. Each batch
  * searches from the top, because the previous batch has already dropped
@@ -362,25 +422,9 @@ function quoteSearchTerm(text) {
  */
 function runCleanup(ruleIndex = 0, batchNumber = 0) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const rulesSheet = ss.getSheetByName('Rules');
-    
-    if (!rulesSheet) {
-      return { success: false, message: 'Rules sheet not found. Please run Setup Sheets first.' };
-    }
-    
-    const lastRow = rulesSheet.getLastRow();
-    if (lastRow <= 1) {
-      return { success: false, message: 'No rules found. Please add rules to the Rules sheet.' };
-    }
-    
-    const allRules = rulesSheet.getRange(2, 1, lastRow - 1, 4).getValues();
-    const activeRules = allRules
-      .map((rule, idx) => ({ rule, originalIndex: idx }))
-      .filter(({ rule }) => rule[3] === 'Active' && rule[1] && rule[2]);
-    
-    if (activeRules.length === 0) {
-      return { success: false, message: 'No active rules found. Please add active rules to the Rules sheet.' };
+    const { rules: activeRules, error } = getActiveRules();
+    if (error) {
+      return { success: false, message: error };
     }
     
     if (ruleIndex >= activeRules.length) {
@@ -393,21 +437,18 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
       };
     }
     
-    const { rule, originalIndex } = activeRules[ruleIndex];
-    const [ruleType, value, action, status] = rule;
+    const rule = activeRules[ruleIndex];
+    const { ruleType, value, action, ruleNumber } = rule;
     
     try {
-      const searchQuery = buildSearchQuery(ruleType, value, action);
-      if (!searchQuery) {
+      const processed = cleanupRuleBatch(rule);
+      if (processed === null) {
         return runCleanup(ruleIndex + 1, 0);
       }
       
-      const batchSize = 50;
-      const threads = GmailApp.search(searchQuery, 0, batchSize);
-      
-      if (threads.length === 0) {
+      if (processed === 0) {
         if (batchNumber === 0) {
-          logAction(`Cleanup Rule ${originalIndex + 1}`, `${action} - ${ruleType}: ${value} - No emails found`, 0);
+          logAction(`Cleanup Rule ${ruleNumber}`, `${action} - ${ruleType}: ${value} - No emails found`, 0);
         }
         
         return {
@@ -424,30 +465,18 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
         };
       }
       
-      switch (action) {
-        case 'Trash':
-          threads.forEach(thread => thread.moveToTrash());
-          break;
-        case 'Archive':
-          threads.forEach(thread => thread.moveToArchive());
-          break;
-        case 'Mark Read':
-          threads.forEach(thread => thread.markRead());
-          break;
-      }
-      
       if (batchNumber === 0) {
-        logAction(`Cleanup Rule ${originalIndex + 1}`, `${action} - ${ruleType}: ${value} - Started`, threads.length);
+        logAction(`Cleanup Rule ${ruleNumber}`, `${action} - ${ruleType}: ${value} - Started`, processed);
       }
       
-      const hasMoreInRule = threads.length === batchSize;
+      const hasMoreInRule = processed === CLEANUP_BATCH_SIZE;
       
       return {
         success: true,
         message: `Processing rule ${ruleIndex + 1}/${activeRules.length}...`,
         ruleIndex: ruleIndex,
         batchNumber: hasMoreInRule ? batchNumber + 1 : 0,
-        emailsProcessed: threads.length,
+        emailsProcessed: processed,
         hasMoreInRule: hasMoreInRule,
         hasMoreRules: !hasMoreInRule && ((ruleIndex + 1) < activeRules.length),
         currentRuleName: `${ruleType}: ${value}`,
@@ -457,7 +486,7 @@ function runCleanup(ruleIndex = 0, batchNumber = 0) {
       };
       
     } catch (error) {
-      logAction(`Cleanup Rule ${originalIndex + 1}`, `Error: ${error.message}`, 0);
+      logAction(`Cleanup Rule ${ruleNumber}`, `Error: ${error.message}`, 0);
       
       return {
         success: true,
@@ -544,61 +573,56 @@ function setupTriggers(frequency) {
   }
 }
 
+/**
+ * Runs every active rule to completion from a time-driven trigger. Stops
+ * early if it gets close to the execution time limit; the next scheduled
+ * run picks up whatever is left.
+ */
 function runScheduledCleanup() {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const rulesSheet = ss.getSheetByName('Rules');
-    
-    if (!rulesSheet) {
-      logAction('Scheduled Cleanup', 'Rules sheet not found', 0);
+    const { rules, error } = getActiveRules();
+    if (error) {
+      logAction('Scheduled Cleanup', error, 0);
       return;
     }
     
-    const lastRow = rulesSheet.getLastRow();
-    if (lastRow <= 1) {
-      logAction('Scheduled Cleanup', 'No rules found', 0);
-      return;
-    }
-    
-    const rules = rulesSheet.getRange(2, 1, lastRow - 1, 4).getValues();
+    const startTime = Date.now();
+    const outOfTime = () => Date.now() - startTime > SCHEDULED_TIME_BUDGET_MS;
     let totalProcessed = 0;
+    let stoppedEarly = false;
     
-    rules.forEach((rule, index) => {
-      const [ruleType, value, action, status] = rule;
-      
-      if (status !== 'Active' || !value || !action) {
-        return;
-      }
+    for (const rule of rules) {
+      const { ruleType, value, action, ruleNumber } = rule;
+      let ruleTotal = 0;
       
       try {
-        const searchQuery = buildSearchQuery(ruleType, value, action);
-        if (!searchQuery) return;
-        
-        const threads = GmailApp.search(searchQuery, 0, 100);
-        
-        if (threads.length === 0) return;
-        
-        switch (action) {
-          case 'Trash':
-            threads.forEach(thread => thread.moveToTrash());
+        let processed;
+        do {
+          if (outOfTime()) {
+            stoppedEarly = true;
             break;
-          case 'Archive':
-            threads.forEach(thread => thread.moveToArchive());
-            break;
-          case 'Mark Read':
-            threads.forEach(thread => thread.markRead());
-            break;
+          }
+          processed = cleanupRuleBatch(rule);
+          ruleTotal += processed || 0;
+        } while (processed === CLEANUP_BATCH_SIZE);
+        
+        if (ruleTotal > 0) {
+          logAction(`Cleanup Rule ${ruleNumber}`, `${action} - ${ruleType}: ${value}`, ruleTotal);
         }
         
-        totalProcessed += threads.length;
-        logAction(`Cleanup Rule ${index + 1}`, `${action} - ${ruleType}: ${value}`, threads.length);
-        
       } catch (error) {
-        logAction(`Cleanup Rule ${index + 1}`, `Error: ${error.message}`, 0);
+        logAction(`Cleanup Rule ${ruleNumber}`, `Error: ${error.message}`, ruleTotal);
       }
-    });
+      
+      totalProcessed += ruleTotal;
+      if (stoppedEarly) break;
+    }
     
-    logAction('Scheduled Cleanup Complete', `Processed ${totalProcessed} emails`, totalProcessed);
+    if (stoppedEarly) {
+      logAction('Scheduled Cleanup Stopped', `Reached the time limit after ${totalProcessed} emails. The rest will be cleaned up on the next scheduled run.`, totalProcessed);
+    } else {
+      logAction('Scheduled Cleanup Complete', `Processed ${totalProcessed} emails`, totalProcessed);
+    }
     
   } catch (error) {
     logAction('Scheduled Cleanup Error', error.message, 0);

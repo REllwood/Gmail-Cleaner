@@ -162,6 +162,8 @@ Each action only picks up emails it hasn't already handled: Trash ignores anythi
    - **Weekly (Monday 2:00 AM)**: Runs every Monday at 2:00 AM
 3. The script will automatically run cleanup based on your rules
 
+Each scheduled run works through every active rule until nothing is left to clean. Apps Script stops any run after 6 minutes, so if there's a large backlog the run stops after about 5 minutes, logs how far it got, and the next scheduled run carries on from there.
+
 ## Important Notes
 
 ### Performance & Reliability
