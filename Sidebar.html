@@ -581,7 +581,7 @@
             `<div class="error-message">System Error: ${error.message}</div>`;
           document.getElementById('resumeAnalysisBtn').style.display = 'block';
         })
-        .scanInbox(startIndex, clearSheet, currentScanLimit);
+        .scanInbox(startIndex, clearSheet, currentScanLimit, totalEmailsProcessed);
     }
 
     function updateAnalysisProgress(result) {

@@ -117,13 +117,15 @@ function setupSheets() {
 
 /**
  * Scans the inbox in small batches for progress updates
- * @param {number} startIndex - Where to start (0, 50, 100, etc.)
+ * @param {number} startIndex - Inbox thread to start from (0, 50, 100, etc.)
  * @param {boolean} clearSheet - Whether to clear existing data first
  * @param {number} maxEmails - Maximum emails to scan (default: 1000)
+ * @param {number} emailsSoFar - Emails already scanned in earlier batches
  */
-function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_LIMIT) {
-  // Ensure maxEmails is a valid number
+function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_LIMIT, emailsSoFar = 0) {
+  // Ensure the counts are valid numbers
   maxEmails = Number(maxEmails) || DEFAULT_SCAN_LIMIT;
+  emailsSoFar = Number(emailsSoFar) || 0;
   
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -133,7 +135,7 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       return { success: false, message: 'Analysis sheet not found. Please run Setup Sheets first.' };
     }
     
-    if (startIndex >= maxEmails) {
+    if (emailsSoFar >= maxEmails) {
       return {
         success: true,
         message: `Scan limit reached (${maxEmails.toLocaleString()} emails)`,
@@ -193,11 +195,20 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       }
     }
     
+    // The limit counts emails, so stop part-way through a batch (or a thread)
+    // once it's reached
     let emailsInThisChunk = 0;
-    GmailApp.getMessagesForThreads(threads).forEach(messages => {
-      emailsInThisChunk += messages.length;
+    let threadsScanned = 0;
+    const limitHit = () => emailsSoFar + emailsInThisChunk >= maxEmails;
+    
+    for (const messages of GmailApp.getMessagesForThreads(threads)) {
+      if (limitHit()) break;
+      threadsScanned++;
       
-      messages.forEach(message => {
+      for (const message of messages) {
+        if (limitHit()) break;
+        emailsInThisChunk++;
+        
         const sender = message.getFrom();
         const subject = message.getSubject();
         const date = message.getDate();
@@ -214,8 +225,8 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
           senderMap[email].lastReceived = date;
           senderMap[email].sampleSubject = subject;
         }
-      });
-    });
+      }
+    }
     
     const senderArray = Object.keys(senderMap).map(email => ({
       email: email,
@@ -243,18 +254,20 @@ function scanInbox(startIndex = 0, clearSheet = true, maxEmails = DEFAULT_SCAN_L
       analysisSheet.getRange(2, 2, dataToWrite.length, 1).setNumberFormat('#,##0');
     }
     
-    const nextIndex = startIndex + chunkSize;
-    const hasMore = threads.length === chunkSize && nextIndex < maxEmails;
+    const nextIndex = startIndex + threadsScanned;
+    const totalEmailsSoFar = emailsSoFar + emailsInThisChunk;
+    const limitReached = totalEmailsSoFar >= maxEmails;
+    const hasMore = !limitReached && threads.length === chunkSize;
     
     return {
       success: true,
-      message: nextIndex >= maxEmails ? `Scan limit reached (${maxEmails.toLocaleString()} emails)` : `Processing...`,
+      message: limitReached ? `Scan limit reached (${maxEmails.toLocaleString()} emails)` : `Processing...`,
       emailsProcessed: emailsInThisChunk,
-      totalEmailsSoFar: startIndex + emailsInThisChunk,
+      totalEmailsSoFar: totalEmailsSoFar,
       senderCount: senderArray.length,
       hasMore: hasMore,
       nextIndex: nextIndex,
-      limitReached: nextIndex >= maxEmails
+      limitReached: limitReached
     };
     
   } catch (error) {
