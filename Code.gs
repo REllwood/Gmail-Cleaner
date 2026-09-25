@@ -11,8 +11,8 @@ function onOpen() {
     .addItem('Launch Sidebar', 'showSidebar')
     .addItem('Setup Sheets', 'setupSheets')
     .addSeparator()
-    .addItem('Analyse Inbox Now', 'scanInbox')
-    .addItem('Run Cleanup Now', 'runCleanup')
+    .addItem('Analyse Inbox Now', 'analyseFromMenu')
+    .addItem('Run Cleanup Now', 'cleanupFromMenu')
     .addToUi();
 }
 
@@ -21,6 +21,36 @@ function showSidebar() {
     .setTitle('Gmail Cleaner')
     .setWidth(800);
   SpreadsheetApp.getUi().showSidebar(html);
+}
+
+// Analysis and cleanup run in batches driven by the sidebar, so the menu
+// items open the sidebar and leave it a note of which job to start
+const PENDING_ACTION_KEY = 'pendingSidebarAction';
+
+function analyseFromMenu() {
+  openSidebarWithAction('analyse');
+}
+
+function cleanupFromMenu() {
+  openSidebarWithAction('cleanup');
+}
+
+function openSidebarWithAction(action) {
+  CacheService.getUserCache().put(PENDING_ACTION_KEY, action, 120);
+  showSidebar();
+}
+
+/**
+ * Returns the job a menu item asked the sidebar to start, and clears it
+ * @return {string|null} 'analyse', 'cleanup', or null
+ */
+function takePendingSidebarAction() {
+  const cache = CacheService.getUserCache();
+  const action = cache.get(PENDING_ACTION_KEY);
+  if (action) {
+    cache.remove(PENDING_ACTION_KEY);
+  }
+  return action;
 }
 
 /**
